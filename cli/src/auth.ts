@@ -78,7 +78,8 @@ async function getVercelToken(): Promise<string> {
 
 async function ghIsInstalled(): Promise<boolean> {
   try {
-    await exec("command -v gh");
+    const cmd = process.platform === "win32" ? "where gh" : "command -v gh";
+    await exec(cmd);
     return true;
   } catch {
     return false;
