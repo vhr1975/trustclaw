@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   const { user_id: userId, connected_account_id: connectedAccountId } = parsed.data.metadata;
   const { thread_id: threadId, sender, subject, message_text: messageText } = parsed.data.data;
 
-  const recipientEmail = sender.match(/<([^>]+)>/)?.[1] ?? sender;
+  const recipientEmail = /<([^>]+)>/.exec(sender)?.[1] ?? sender;
 
   console.warn("[agent] incoming email | from:", sender, "| recipientEmail:", recipientEmail, "| subject:", subject, "| threadId:", threadId, "| userId:", userId, "| connectedAccountId:", connectedAccountId);
 
