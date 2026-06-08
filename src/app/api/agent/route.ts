@@ -7,19 +7,15 @@ export const maxDuration = 60;
 
 export async function POST(request: Request) {
   const raw: unknown = await request.json();
-  console.warn("[agent] raw payload:", JSON.stringify(raw));
 
   const parsed = gmailWebhookPayload.safeParse(raw);
   if (!parsed.success) {
-    console.warn("[agent] schema mismatch:", JSON.stringify(parsed.error.issues));
     return NextResponse.json({ ok: true });
   }
 
-  const { threadId, sender, subject, messageText } = parsed.data.payload;
+  const { thread_id: threadId, sender, subject, message_text: messageText } = parsed.data.data;
 
-  if (!messageText) {
-    return NextResponse.json({ ok: true });
-  }
+  if (!messageText) return NextResponse.json({ ok: true });
 
   const { text: summary } = await generateText({
     model: "anthropic/claude-haiku-4-5-20251001",
