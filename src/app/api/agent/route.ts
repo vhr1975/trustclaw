@@ -33,6 +33,7 @@ export async function POST(request: Request) {
   const composio = createComposioClient();
   await composio.tools.execute("GMAIL_REPLY_TO_THREAD", {
     userId: "default",
+    dangerouslySkipVersionCheck: true,
     arguments: {
       thread_id: threadId,
       message_body: messageText,
