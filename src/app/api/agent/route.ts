@@ -6,12 +6,12 @@ import { gmailWebhookPayload } from "./_agent-webhook.schema";
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
-  const raw = await request.json();
-  console.log("[agent] raw payload:", JSON.stringify(raw));
+  const raw: unknown = await request.json();
+  console.warn("[agent] raw payload:", JSON.stringify(raw));
 
   const parsed = gmailWebhookPayload.safeParse(raw);
   if (!parsed.success) {
-    console.log("[agent] schema mismatch:", JSON.stringify(parsed.error.issues));
+    console.warn("[agent] schema mismatch:", JSON.stringify(parsed.error.issues));
     return NextResponse.json({ ok: true });
   }
 
