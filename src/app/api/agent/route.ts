@@ -18,7 +18,9 @@ export async function POST(request: Request) {
   const { user_id: userId, connected_account_id: connectedAccountId } = parsed.data.metadata;
   const { thread_id: threadId, sender, subject, message_text: messageText } = parsed.data.data;
 
-  console.warn("[agent] incoming email | from:", sender, "| subject:", subject, "| threadId:", threadId, "| userId:", userId, "| connectedAccountId:", connectedAccountId);
+  const recipientEmail = sender.match(/<([^>]+)>/)?.[1] ?? sender;
+
+  console.warn("[agent] incoming email | from:", sender, "| recipientEmail:", recipientEmail, "| subject:", subject, "| threadId:", threadId, "| userId:", userId, "| connectedAccountId:", connectedAccountId);
 
   if (!messageText) {
     console.warn("[agent] skipping: empty message_text");
@@ -51,7 +53,7 @@ export async function POST(request: Request) {
       thread_id: threadId,
       message_body: messageText,
       subject: replySubject,
-      recipient_email: sender,
+      recipient_email: recipientEmail,
     },
   });
 
