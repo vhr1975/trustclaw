@@ -14,6 +14,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
+  const { user_id: userId, connected_account_id: connectedAccountId } = parsed.data.metadata;
   const { thread_id: threadId, sender, subject, message_text: messageText } = parsed.data.data;
 
   if (!messageText) return NextResponse.json({ ok: true });
@@ -32,8 +33,8 @@ export async function POST(request: Request) {
 
   const composio = createComposioClient();
   await composio.tools.execute("GMAIL_REPLY_TO_THREAD", {
-    userId: "default",
-    connectedAccountId: "ca_Utj1r3_GcCcq",
+    userId,
+    connectedAccountId,
     dangerouslySkipVersionCheck: true,
     arguments: {
       thread_id: threadId,

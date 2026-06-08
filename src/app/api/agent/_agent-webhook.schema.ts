@@ -1,6 +1,10 @@
 import { z } from "zod";
 
 export const gmailWebhookPayload = z.object({
+  metadata: z.object({
+    user_id: z.string(),
+    connected_account_id: z.string(),
+  }),
   data: z.object({
     thread_id: z.string(),
     sender: z.string(),
