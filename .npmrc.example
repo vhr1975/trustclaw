@@ -1,0 +1,5 @@
+public-hoist-pattern[]=*eslint*
+public-hoist-pattern[]=*prettier*
+
+registry=https://trialw56ywp.jfrog.io/artifactory/api/npm/victor-npm/
+//trialw56ywp.jfrog.io/artifactory/api/npm/victor-npm/:_authToken=YOUR_TOKEN_HERE
