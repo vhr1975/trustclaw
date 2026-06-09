@@ -1,4 +1,4 @@
-# TrustClaw — JFrog Forward Deployed AI Architect Demo
+# TrustClaw - JFrog Forward Deployed AI Architect Demo
 
 > **Assignment:** Fork an open-source AI agent, add an email-summarization workflow, proxy all dependencies through JFrog Artifactory, deploy to Vercel, and document the developer experience.
 >
@@ -19,13 +19,13 @@ When an email arrives at a connected Gmail account, the agent:
 
 No human in the loop. No manual polling. The agent runs on Vercel serverless infrastructure and wakes up only when triggered.
 
-All **npm packages** are proxied through **JFrog Artifactory** — the project registry is configured to route every `pnpm install` through a private JFrog virtual npm repository, giving the team full visibility, caching, and control over the dependency supply chain.
+All **npm packages** are proxied through **JFrog Artifactory** - the project registry is configured to route every `pnpm install` through a private JFrog virtual npm repository, giving the team full visibility, caching, and control over the dependency supply chain.
 
 ---
 
 ## Architecture
 
-### Runtime — email agent flow
+### Runtime - email agent flow
 
 ```mermaid
 flowchart TD
@@ -36,7 +36,7 @@ flowchart TD
         F["GMAIL_SEND_EMAIL\nTool execution"]
     end
 
-    subgraph Vercel["☁️ Vercel — TrustClaw Fork"]
+    subgraph Vercel["☁️ Vercel - TrustClaw Fork"]
         C["/api/agent\nServerless function"]
         C1["1 · Zod schema validation"]
         C2["2 · Deduplicate message ID"]
@@ -59,7 +59,7 @@ flowchart TD
     F --> G
 ```
 
-### Build-time — dependency supply chain
+### Build-time - dependency supply chain
 
 ```mermaid
 flowchart LR
@@ -75,7 +75,7 @@ flowchart LR
     JFROG -->|"verified packages"| VERCEL["☁️ Vercel build\nproduction deploy"]
 ```
 
-> **Why this matters:** Every package installed — including transitive dependencies — is routed through JFrog first. The team gets an immutable audit trail, vulnerability scanning, and the ability to block malicious packages before they reach production.
+> **Why this matters:** Every package installed - including transitive dependencies - is routed through JFrog first. The team gets an immutable audit trail, vulnerability scanning, and the ability to block malicious packages before they reach production.
 
 ### Component map
 
@@ -115,11 +115,11 @@ flowchart LR
 
 | File | Purpose |
 |---|---|
-| `src/app/api/agent/route.ts` | Email gateway webhook — the entire agent logic lives here |
+| `src/app/api/agent/route.ts` | Email gateway webhook - the entire agent logic lives here |
 | `src/app/api/agent/_agent-webhook.schema.ts` | Zod schema validating the Composio webhook payload |
 | `scripts/setup-trigger.ts` | One-time script to register the Gmail trigger with Composio |
 | `.npmrc` | Routes pnpm to JFrog Artifactory (token via env var) |
-| `.npmrc.example` | Redacted version safe to commit — shows the config shape |
+| `.npmrc.example` | Redacted version safe to commit - shows the config shape |
 
 Everything else is the upstream TrustClaw fork unchanged.
 
@@ -230,15 +230,15 @@ curl -X POST https://your-vercel-url.vercel.app/api/agent \
 The following friction points were encountered during implementation and are worth flagging as product feedback:
 
 **1. Webhook payload schema not documented for v3**
-The Composio trigger fires a payload with `{ metadata: { user_id, connected_account_id }, data: { message_id, thread_id, sender, subject, message_text } }`. This shape is not documented — the examples in the docs show a different structure. Discovery required inspecting live webhook logs.
+The Composio trigger fires a payload with `{ metadata: { user_id, connected_account_id }, data: { message_id, thread_id, sender, subject, message_text } }`. This shape is not documented - the examples in the docs show a different structure. Discovery required inspecting live webhook logs.
 
 **2. `TOOL_VERSION_REQUIRED` error with no resolution path**
-SDK v0.6.3 throws `TOOL_VERSION_REQUIRED` when executing tools without an explicit toolkit version. The fix (`dangerouslySkipVersionCheck: true`) is not in the docs — it requires searching GitHub issues or the SDK source.
+SDK v0.6.3 throws `TOOL_VERSION_REQUIRED` when executing tools without an explicit toolkit version. The fix (`dangerouslySkipVersionCheck: true`) is not in the docs - it requires searching GitHub issues or the SDK source.
 
 **3. `GMAIL_REPLY_TO_THREAD` silently ignores the `subject` parameter**
 Gmail threading rules override any subject passed to this tool. The only way to control the reply subject is to use `GMAIL_SEND_EMAIL` and create a new message. This behavior is not documented.
 
-**4. `ConnectedAccountEntityIdMismatch` — userId/connectedAccountId coupling is opaque**
+**4. `ConnectedAccountEntityIdMismatch` - userId/connectedAccountId coupling is opaque**
 The connected account belongs to a specific user entity. Passing any other `userId` fails with a cryptic mismatch error. The relationship between user IDs and connected account IDs is not explained in the getting-started docs.
 
 **5. Polling interval is unpredictable**
@@ -365,7 +365,7 @@ The design choices:
 TrustClaw runs fine on the free Hobby plan, but Vercel applies two limits that affect the agent:
 
 - **Cron jobs can only run once per day**, and even then they fire anywhere within a 60-minute window of the scheduled hour. Any cron expression more frequent than daily (e.g. hourly, every-30-min) **fails at deploy time** on Hobby. The CLI auto-adjusts `vercel.json` to a daily schedule when it detects you're on Hobby.
-- **Functions are capped at 300s (5 min)** — long-running agent turns may time out.
+- **Functions are capped at 300s (5 min)** - long-running agent turns may time out.
 
 To get **per-minute cron precision** and **up to 800s (~13 min) per function**, upgrade to [Vercel Pro](https://vercel.com/pricing) and re-run the CLI (or manually flip `vercel.json` back to `* * * * *` + bump `maxDuration`).
 
