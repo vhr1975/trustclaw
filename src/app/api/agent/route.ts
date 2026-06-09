@@ -37,6 +37,15 @@ export async function POST(request: Request) {
   // Extract the bare address; fall back to the raw string if no angle brackets.
   const recipientEmail = /<([^>]+)>/.exec(sender)?.[1] ?? sender;
 
+  // Only process emails from the configured allowed domain. Prevents the agent
+  // from replying to newsletters, notifications, and bounce messages that arrive
+  // in the shared Gmail inbox.
+  const allowedDomain = process.env.AGENT_ALLOWED_SENDER_DOMAIN;
+  if (allowedDomain && !recipientEmail.endsWith(allowedDomain)) {
+    console.warn("[agent] skipping: sender not in allowed domain:", recipientEmail);
+    return NextResponse.json({ ok: true });
+  }
+
   console.warn("[agent] incoming email | messageId:", messageId, "| from:", sender, "| recipientEmail:", recipientEmail, "| subject:", subject, "| threadId:", threadId);
 
   // Guard against processing our own replies — GMAIL_SEND_EMAIL creates a new
