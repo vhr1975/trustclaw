@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     messages: [
       {
         role: "user",
-        content: `Subject: ${subject}\n\n${messageText}`,
+        content: `Subject: ${subject}\n\n${messageText.slice(0, 3000)}`,
       },
     ],
   });
