@@ -1,4 +1,3 @@
-import { anthropic } from "@ai-sdk/anthropic";
 import { generateText } from "ai";
 import { NextResponse } from "next/server";
 import { createComposioClient } from "~/server/clients/composio";
@@ -39,7 +38,7 @@ export async function POST(request: Request) {
   const plainText = isHtml ? messageText.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() : messageText;
 
   const { text: summary } = await generateText({
-    model: anthropic("claude-haiku-4-5-20251001"),
+    model: "anthropic/claude-haiku-4-5-20251001",
     system:
       "Summarize the following email into a single concise line. Reply with only the summary, no trailing punctuation.",
     messages: [
