@@ -36,6 +36,7 @@ export async function POST(request: Request) {
   }
 
   const isHtml = /<[a-z][\s\S]*>/i.test(messageText);
+  const plainText = isHtml ? messageText.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() : messageText;
 
   const { text: summary } = await generateText({
     model: anthropic("claude-haiku-4-5-20251001"),
@@ -61,10 +62,10 @@ export async function POST(request: Request) {
     dangerouslySkipVersionCheck: true,
     arguments: {
       thread_id: threadId,
-      message_body: messageText,
+      message_body: `AGENT SUMMARY: ${summary.trim()}\n\n---\n\n${plainText}`,
       subject: replySubject,
       recipient_email: recipientEmail,
-      is_html: isHtml,
+      is_html: false,
     },
   });
 
