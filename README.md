@@ -1,3 +1,210 @@
+# TrustClaw — JFrog Forward Deployed AI Architect Demo
+
+> **Assignment:** Fork an open-source AI agent, add an email-summarization workflow, proxy all dependencies through JFrog Artifactory, deploy to Vercel, and document the developer experience.
+>
+> **Live demo:** [trustclaw-jfrog-demo.vercel.app](https://trustclaw-jfrog-demo.vercel.app)
+> **Submitted by:** Victor Ramirez · June 2026
+
+---
+
+## What I built
+
+An **autonomous email agent** on top of the open-source [TrustClaw](https://github.com/ComposioHQ/trustclaw) AI platform.
+
+When an email arrives at a connected Gmail account, the agent:
+
+1. Receives the email via a Composio Gmail webhook
+2. Sends the body to **Claude** (via Vercel AI Gateway) for a one-line summary
+3. Replies to the sender with subject **`AGENT SUMMARY {summary}`** and the original message body
+
+No human in the loop. No manual polling. The agent runs on Vercel serverless infrastructure and wakes up only when triggered.
+
+All **npm packages** are proxied through **JFrog Artifactory** — the project registry is configured to route every `pnpm install` through a private JFrog virtual npm repository, giving the team full visibility, caching, and control over the dependency supply chain.
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Gmail Inbox                              │
+│                   vramirez75@gmail.com                          │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │  new email arrives
+                           ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                  Composio Gmail Trigger                         │
+│            GMAIL_NEW_GMAIL_MESSAGE  (polling)                   │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │  POST webhook
+                           ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              Vercel Serverless Function                         │
+│         /api/agent  (src/app/api/agent/route.ts)                │
+│                                                                 │
+│  1. Validate Composio payload (Zod schema)                      │
+│  2. Extract sender, subject, message body                       │
+│  3. Strip HTML, deduplicate message IDs                         │
+│  4. Call Vercel AI Gateway → Claude Haiku → one-line summary    │
+│  5. Execute GMAIL_SEND_EMAIL via Composio                       │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │  sends reply
+                           ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     Sender's inbox                              │
+│   Subject: AGENT SUMMARY {summary}                              │
+│   Body:    AGENT SUMMARY: {summary}                             │
+│            ---                                                  │
+│            {original email body}                                │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Dependency supply chain:**
+
+```
+pnpm install
+    → .npmrc routes all requests to JFrog Artifactory
+    → JFrog proxies + caches from npmjs.org
+    → 900+ packages cached in private registry
+```
+
+---
+
+## What's new in this fork
+
+| File | Purpose |
+|---|---|
+| `src/app/api/agent/route.ts` | Email gateway webhook — the entire agent logic lives here |
+| `src/app/api/agent/_agent-webhook.schema.ts` | Zod schema validating the Composio webhook payload |
+| `scripts/setup-trigger.ts` | One-time script to register the Gmail trigger with Composio |
+| `.npmrc` | Routes pnpm to JFrog Artifactory (token via env var) |
+| `.npmrc.example` | Redacted version safe to commit — shows the config shape |
+
+Everything else is the upstream TrustClaw fork unchanged.
+
+---
+
+## Tech stack
+
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 15 (App Router) |
+| API | tRPC |
+| Auth | Better Auth (username/password) |
+| Database | Prisma + Neon PostgreSQL + pgvector |
+| LLM | Claude Haiku via Vercel AI Gateway |
+| Integrations | Composio SDK (`@composio/core`) |
+| Email trigger | `GMAIL_NEW_GMAIL_MESSAGE` (Composio polling trigger) |
+| Email send | `GMAIL_SEND_EMAIL` (Composio tool) |
+| Registry | JFrog Artifactory (npm proxy) |
+| Hosting | Vercel (serverless) |
+
+---
+
+## Setup
+
+### 1. Clone and configure the registry
+
+```bash
+git clone https://github.com/vhr1975/trustclaw-jfrog-demo.git
+cd trustclaw-jfrog-demo
+cp .npmrc.example .npmrc
+# Edit .npmrc and replace YOUR_TOKEN_HERE with your JFrog Artifactory token
+```
+
+### 2. Install dependencies (routes through JFrog)
+
+```bash
+pnpm install
+```
+
+All packages are fetched from JFrog Artifactory, which proxies and caches from npmjs.org.
+
+### 3. Configure environment variables
+
+Copy `.env.example` to `.env` and fill in:
+
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | Neon PostgreSQL connection string |
+| `BETTER_AUTH_SECRET` | Session signing key (`openssl rand -base64 32`) |
+| `COMPOSIO_API_KEY` | Composio API key (from [app.composio.dev](https://app.composio.dev)) |
+| `CRON_SECRET` | Auth for cron routes |
+| `JFROG_AUTH_TOKEN` | JFrog Artifactory npm token |
+
+### 4. Deploy to Vercel
+
+```bash
+npx @composio/trustclaw deploy
+```
+
+Or import the repo directly in the Vercel dashboard. Add the environment variables above in **Settings → Environment Variables**.
+
+### 5. Register the Gmail trigger
+
+Connect your Gmail account in the Composio dashboard, then run:
+
+```bash
+COMPOSIO_API_KEY=your_key npx tsx scripts/setup-trigger.ts
+```
+
+This registers a `GMAIL_NEW_GMAIL_MESSAGE` polling trigger for the connected account.
+
+### 6. Set the webhook URL in Composio
+
+In the [Composio dashboard](https://app.composio.dev) → **Settings → Webhooks**, set the webhook URL to:
+
+```
+https://your-vercel-url.vercel.app/api/agent
+```
+
+### 7. Test end-to-end
+
+Send an email to the connected Gmail account. Within ~15 minutes (Composio polling interval), the sender will receive a reply with subject `AGENT SUMMARY {one-line summary}`.
+
+To test immediately without waiting for the poll:
+
+```bash
+curl -X POST https://your-vercel-url.vercel.app/api/agent \
+  -H "Content-Type: application/json" \
+  -d '{
+    "metadata": {
+      "user_id": "YOUR_COMPOSIO_USER_ID",
+      "connected_account_id": "YOUR_CONNECTED_ACCOUNT_ID"
+    },
+    "data": {
+      "message_id": "test_001",
+      "thread_id": "thread_001",
+      "sender": "Sender Name <sender@example.com>",
+      "subject": "Test email subject",
+      "message_text": "Your full email body here."
+    }
+  }'
+```
+
+---
+
+## Developer experience observations
+
+The following friction points were encountered during implementation and are worth flagging as product feedback:
+
+**1. Webhook payload schema not documented for v3**
+The Composio trigger fires a payload with `{ metadata: { user_id, connected_account_id }, data: { message_id, thread_id, sender, subject, message_text } }`. This shape is not documented — the examples in the docs show a different structure. Discovery required inspecting live webhook logs.
+
+**2. `TOOL_VERSION_REQUIRED` error with no resolution path**
+SDK v0.6.3 throws `TOOL_VERSION_REQUIRED` when executing tools without an explicit toolkit version. The fix (`dangerouslySkipVersionCheck: true`) is not in the docs — it requires searching GitHub issues or the SDK source.
+
+**3. `GMAIL_REPLY_TO_THREAD` silently ignores the `subject` parameter**
+Gmail threading rules override any subject passed to this tool. The only way to control the reply subject is to use `GMAIL_SEND_EMAIL` and create a new message. This behavior is not documented.
+
+**4. `ConnectedAccountEntityIdMismatch` — userId/connectedAccountId coupling is opaque**
+The connected account belongs to a specific user entity. Passing any other `userId` fails with a cryptic mismatch error. The relationship between user IDs and connected account IDs is not explained in the getting-started docs.
+
+**5. Polling interval is unpredictable**
+`GMAIL_NEW_GMAIL_MESSAGE` is described as polling "every ~15 minutes" but in practice intervals vary from 15 to 60+ minutes, especially after high-volume bursts. A production implementation should use Gmail Pub/Sub push notifications for reliable low-latency delivery.
+
+---
+
 # TrustClaw
 
 **Your AI that does things while you sleep. _Securely._**
