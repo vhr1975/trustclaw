@@ -25,47 +25,88 @@ All **npm packages** are proxied through **JFrog Artifactory** — the project r
 
 ## Architecture
 
+### Runtime — email agent flow
+
+```mermaid
+flowchart TD
+    A([📧 Incoming email\narrives in Gmail]) --> B
+
+    subgraph Composio["⚡ Composio Platform"]
+        B["GMAIL_NEW_GMAIL_MESSAGE\nPolling trigger\n~15–60 min interval"]
+        F["GMAIL_SEND_EMAIL\nTool execution"]
+    end
+
+    subgraph Vercel["☁️ Vercel — TrustClaw Fork"]
+        C["/api/agent\nServerless function"]
+        C1["1 · Zod schema validation"]
+        C2["2 · Deduplicate message ID"]
+        C3["3 · Strip HTML from body"]
+        C4["4 · Call AI Gateway"]
+        C5["5 · Build reply + execute tool"]
+        C --> C1 --> C2 --> C3 --> C4 --> C5
+    end
+
+    subgraph AIGateway["🤖 Vercel AI Gateway"]
+        D["Claude Haiku\nanthropic/claude-haiku-4-5-20251001\nOne-line summary"]
+    end
+
+    G([📬 Reply delivered\nSubject: AGENT SUMMARY …])
+
+    B -->|"POST /api/agent\n{sender, subject, body}"| C
+    C4 -->|"generateText()"| D
+    D -->|"summary text"| C4
+    C5 -->|"execute(GMAIL_SEND_EMAIL)"| F
+    F --> G
+```
+
+### Build-time — dependency supply chain
+
+```mermaid
+flowchart LR
+    DEV["👨‍💻 Developer\npnpm install"] -->|".npmrc registry=…"| JFROG
+
+    subgraph JFROG["📦 JFrog Artifactory"]
+        VIRTUAL["Virtual npm repo\nvictor-npm"]
+        CACHE["Local cache\n900+ packages"]
+        VIRTUAL --- CACHE
+    end
+
+    JFROG -->|"cache miss → fetch"| NPM["🌐 npmjs.org\nPublic registry"]
+    JFROG -->|"verified packages"| VERCEL["☁️ Vercel build\nproduction deploy"]
+```
+
+> **Why this matters:** Every package installed — including transitive dependencies — is routed through JFrog first. The team gets an immutable audit trail, vulnerability scanning, and the ability to block malicious packages before they reach production.
+
+### Component map
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        Gmail Inbox                              │
-│                   vramirez75@gmail.com                          │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │  new email arrives
-                           ▼
+│  GitHub (vhr1975/trustclaw-jfrog-demo)                          │
+│  ├── .npmrc               → JFrog Artifactory registry          │
+│  ├── src/app/api/agent/   → Email gateway (NEW)                 │
+│  │   ├── route.ts         → Webhook handler + agent logic       │
+│  │   └── *.schema.ts      → Zod payload validation              │
+│  └── scripts/             → One-time trigger setup              │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │  git push → auto deploy
+                                ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                  Composio Gmail Trigger                         │
-│            GMAIL_NEW_GMAIL_MESSAGE  (polling)                   │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │  POST webhook
-                           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│              Vercel Serverless Function                         │
-│         /api/agent  (src/app/api/agent/route.ts)                │
-│                                                                 │
-│  1. Validate Composio payload (Zod schema)                      │
-│  2. Extract sender, subject, message body                       │
-│  3. Strip HTML, deduplicate message IDs                         │
-│  4. Call Vercel AI Gateway → Claude Haiku → one-line summary    │
-│  5. Execute GMAIL_SEND_EMAIL via Composio                       │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │  sends reply
-                           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                     Sender's inbox                              │
-│   Subject: AGENT SUMMARY {summary}                              │
-│   Body:    AGENT SUMMARY: {summary}                             │
-│            ---                                                  │
-│            {original email body}                                │
+│  Vercel (trustclaw-jfrog-demo.vercel.app)                       │
+│  ├── Next.js 15 App Router                                      │
+│  ├── tRPC API (existing TrustClaw backend)                      │
+│  ├── /api/agent  ← Composio webhook target (NEW)                │
+│  ├── Neon PostgreSQL + pgvector  (memory store)                 │
+│  └── Vercel AI Gateway  (LLM + embeddings)                      │
 └─────────────────────────────────────────────────────────────────┘
-```
-
-**Dependency supply chain:**
-
-```
-pnpm install
-    → .npmrc routes all requests to JFrog Artifactory
-    → JFrog proxies + caches from npmjs.org
-    → 900+ packages cached in private registry
+                                ▲
+            ┌───────────────────┤
+            │                  │
+┌───────────┴──────┐  ┌────────┴───────────────────────────────┐
+│  Composio        │  │  JFrog Artifactory                      │
+│  · Gmail OAuth   │  │  · Virtual npm registry (victor-npm)    │
+│  · Trigger mgmt  │  │  · Proxies + caches all npm packages    │
+│  · Tool exec     │  │  · Audit log of every installed package │
+└──────────────────┘  └────────────────────────────────────────┘
 ```
 
 ---
