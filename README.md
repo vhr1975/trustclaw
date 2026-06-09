@@ -227,22 +227,43 @@ curl -X POST https://your-vercel-url.vercel.app/api/agent \
 
 ## Developer experience observations
 
-The following friction points were encountered during implementation and are worth flagging as product feedback:
+The following friction points were encountered during implementation and are worth flagging as product feedback. Ordered by impact.
 
-**1. Webhook payload schema not documented for v3**
-The Composio trigger fires a payload with `{ metadata: { user_id, connected_account_id }, data: { message_id, thread_id, sender, subject, message_text } }`. This shape is not documented - the examples in the docs show a different structure. Discovery required inspecting live webhook logs.
+---
 
-**2. `TOOL_VERSION_REQUIRED` error with no resolution path**
-SDK v0.6.3 throws `TOOL_VERSION_REQUIRED` when executing tools without an explicit toolkit version. The fix (`dangerouslySkipVersionCheck: true`) is not in the docs - it requires searching GitHub issues or the SDK source.
+**1. `GMAIL_REPLY_TO_THREAD` silently ignores the `subject` parameter**
 
-**3. `GMAIL_REPLY_TO_THREAD` silently ignores the `subject` parameter**
-Gmail threading rules override any subject passed to this tool. The only way to control the reply subject is to use `GMAIL_SEND_EMAIL` and create a new message. This behavior is not documented.
+This is the most impactful friction point because it is a silent failure. The tool executes, returns `successful: true`, and sends an email - but the `subject` field is quietly discarded. Gmail's threading rules take over and keep the original thread subject regardless of what you pass. The only way to control the reply subject is to abandon `GMAIL_REPLY_TO_THREAD` entirely and use `GMAIL_SEND_EMAIL` to create a new standalone message. This behavior is not documented anywhere. A developer building an agent that requires a specific subject format (like this assignment) will ship broken behavior without knowing it.
+
+**Fix:** Document that `GMAIL_REPLY_TO_THREAD` cannot override the subject, and add a note in the tool description pointing to `GMAIL_SEND_EMAIL` as the alternative when subject control is required.
+
+---
+
+**2. Webhook payload schema not documented for v3**
+
+The Composio trigger fires a payload shaped as `{ metadata: { user_id, connected_account_id }, data: { message_id, thread_id, sender, subject, message_text } }`. This structure does not match any example in the current documentation. Discovery required deploying the webhook, sending a live email, and inspecting the raw logs. Every developer integrating a trigger will hit this gap - and without the actual shape, they cannot write a schema validator or safely destructure the payload.
+
+**Fix:** Add one JSON example of the actual v3 webhook payload to the trigger documentation. This is a single code block that eliminates hours of debugging for every developer who builds on triggers.
+
+---
+
+**3. `TOOL_VERSION_REQUIRED` error with no resolution path**
+
+SDK v0.6.3 throws `TOOL_VERSION_REQUIRED` when executing tools without an explicit toolkit version. The error message provides no next step - no flag to set, no version to specify, no link to documentation. The only fix (`dangerouslySkipVersionCheck: true`) exists in a GitHub issue thread, not in any official documentation or the SDK's own error output. This is a self-service dead end: a developer hitting this at 11pm either opens a support ticket or gives up.
+
+**Fix:** Surface `dangerouslySkipVersionCheck: true` directly in the error message, or document the version resolution flow in the SDK reference so developers can find it without searching GitHub.
+
+---
 
 **4. `ConnectedAccountEntityIdMismatch` - userId/connectedAccountId coupling is opaque**
-The connected account belongs to a specific user entity. Passing any other `userId` fails with a cryptic mismatch error. The relationship between user IDs and connected account IDs is not explained in the getting-started docs.
+
+The connected account belongs to a specific user entity. Passing any other `userId` fails with a cryptic mismatch error. The relationship between user IDs and connected account IDs is not explained in the getting-started docs - you only discover it after hitting the error. The fix is to extract both `user_id` and `connected_account_id` dynamically from the webhook payload metadata rather than hardcoding either value.
+
+---
 
 **5. Polling interval is unpredictable**
-`GMAIL_NEW_GMAIL_MESSAGE` is described as polling "every ~15 minutes" but in practice intervals vary from 15 to 60+ minutes, especially after high-volume bursts. A production implementation should use Gmail Pub/Sub push notifications for reliable low-latency delivery.
+
+`GMAIL_NEW_GMAIL_MESSAGE` is described as polling approximately every 15 minutes, but in practice the interval varies from 15 to 60+ minutes and degrades further after high-volume bursts. For any agent that needs to respond to email in near-real-time, this makes the platform feel unreliable - even when everything is working correctly. A production implementation should use Gmail Pub/Sub push notifications for sub-second delivery.
 
 ---
 
