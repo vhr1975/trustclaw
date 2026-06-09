@@ -29,13 +29,22 @@ export async function POST(request: Request) {
 
   console.warn("[agent] incoming email | messageId:", messageId, "| from:", sender, "| recipientEmail:", recipientEmail, "| subject:", subject, "| threadId:", threadId);
 
+  if (subject.startsWith("AGENT SUMMARY")) {
+    console.warn("[agent] skipping: agent-generated email (subject starts with AGENT SUMMARY)");
+    return NextResponse.json({ ok: true });
+  }
+
   if (!messageText) {
     console.warn("[agent] skipping: empty message_text");
     return NextResponse.json({ ok: true });
   }
 
   const isHtml = /<[a-z][\s\S]*>/i.test(messageText);
-  const plainText = isHtml ? messageText.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() : messageText;
+  const stripped = isHtml ? messageText.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() : messageText;
+  const plainText = stripped
+    .replace(/\s*On .{1,200}wrote:[\s\S]*/i, "")
+    .replace(/\s*-{3,}[\s\S]*/g, "")
+    .trim();
 
   const { text: summary } = await generateText({
     model: "anthropic/claude-haiku-4-5-20251001",
@@ -44,7 +53,7 @@ export async function POST(request: Request) {
     messages: [
       {
         role: "user",
-        content: `Subject: ${subject}\n\n${messageText.slice(0, 3000)}`,
+        content: `Subject: ${subject}\n\n${plainText.slice(0, 3000)}`,
       },
     ],
   });
@@ -52,7 +61,7 @@ export async function POST(request: Request) {
   console.warn("[agent] summary generated:", summary.trim());
 
   const replySubject = `AGENT SUMMARY ${summary.trim()}`;
-  console.warn("[agent] sending reply | to:", recipientEmail, "| subject:", replySubject, "| isHtml:", isHtml);
+  console.warn("[agent] sending reply | to:", recipientEmail, "| subject:", replySubject);
 
   const composio = createComposioClient();
   const result = await composio.tools.execute("GMAIL_SEND_EMAIL", {
