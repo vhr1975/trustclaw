@@ -6,6 +6,8 @@ import { gmailWebhookPayload } from "./_agent-webhook.schema";
 
 export const maxDuration = 60;
 
+const processed = new Set<string>();
+
 export async function POST(request: Request) {
   const raw: unknown = await request.json();
 
@@ -16,16 +18,24 @@ export async function POST(request: Request) {
   }
 
   const { user_id: userId, connected_account_id: connectedAccountId } = parsed.data.metadata;
-  const { thread_id: threadId, sender, subject, message_text: messageText } = parsed.data.data;
+  const { message_id: messageId, thread_id: threadId, sender, subject, message_text: messageText } = parsed.data.data;
+
+  if (processed.has(messageId)) {
+    console.warn("[agent] skipping duplicate messageId:", messageId);
+    return NextResponse.json({ ok: true });
+  }
+  processed.add(messageId);
 
   const recipientEmail = /<([^>]+)>/.exec(sender)?.[1] ?? sender;
 
-  console.warn("[agent] incoming email | from:", sender, "| recipientEmail:", recipientEmail, "| subject:", subject, "| threadId:", threadId, "| userId:", userId, "| connectedAccountId:", connectedAccountId);
+  console.warn("[agent] incoming email | messageId:", messageId, "| from:", sender, "| recipientEmail:", recipientEmail, "| subject:", subject, "| threadId:", threadId);
 
   if (!messageText) {
     console.warn("[agent] skipping: empty message_text");
     return NextResponse.json({ ok: true });
   }
+
+  const isHtml = /<[a-z][\s\S]*>/i.test(messageText);
 
   const { text: summary } = await generateText({
     model: anthropic("claude-haiku-4-5-20251001"),
@@ -42,7 +52,7 @@ export async function POST(request: Request) {
   console.warn("[agent] summary generated:", summary.trim());
 
   const replySubject = `AGENT SUMMARY ${summary.trim()}`;
-  console.warn("[agent] sending reply | to:", sender, "| subject:", replySubject, "| threadId:", threadId);
+  console.warn("[agent] sending reply | to:", recipientEmail, "| subject:", replySubject, "| isHtml:", isHtml);
 
   const composio = createComposioClient();
   const result = await composio.tools.execute("GMAIL_REPLY_TO_THREAD", {
@@ -54,6 +64,7 @@ export async function POST(request: Request) {
       message_body: messageText,
       subject: replySubject,
       recipient_email: recipientEmail,
+      is_html: isHtml,
     },
   });
 

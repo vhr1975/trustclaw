@@ -6,6 +6,7 @@ export const gmailWebhookPayload = z.object({
     connected_account_id: z.string(),
   }),
   data: z.object({
+    message_id: z.string(),
     thread_id: z.string(),
     sender: z.string(),
     subject: z.string().default(""),
