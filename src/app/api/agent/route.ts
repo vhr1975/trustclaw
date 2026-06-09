@@ -56,15 +56,14 @@ export async function POST(request: Request) {
   console.warn("[agent] sending reply | to:", recipientEmail, "| subject:", replySubject, "| isHtml:", isHtml);
 
   const composio = createComposioClient();
-  const result = await composio.tools.execute("GMAIL_REPLY_TO_THREAD", {
+  const result = await composio.tools.execute("GMAIL_SEND_EMAIL", {
     userId,
     connectedAccountId,
     dangerouslySkipVersionCheck: true,
     arguments: {
-      thread_id: threadId,
-      message_body: `AGENT SUMMARY: ${summary.trim()}\n\n---\n\n${plainText}`,
-      subject: replySubject,
       recipient_email: recipientEmail,
+      subject: replySubject,
+      body: `AGENT SUMMARY: ${summary.trim()}\n\n---\n\n${plainText}`,
       is_html: false,
     },
   });
