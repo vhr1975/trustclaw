@@ -3,6 +3,9 @@
 > **Assignment:** Fork an open-source AI agent, add an email-summarization workflow, proxy all dependencies through JFrog Artifactory, deploy to Vercel, and document the developer experience.
 >
 > **Live demo:** [trustclaw-jfrog-demo.vercel.app](https://trustclaw-jfrog-demo.vercel.app)
+> **GitHub:** [vhr1975/trustclaw-jfrog-demo](https://github.com/vhr1975/trustclaw-jfrog-demo)
+> **JFrog:** [victor-npm virtual repository](https://trialw56ywp.jfrog.io/ui/repos/tree/General/victor-npm)
+> **Composio:** [triggers dashboard](https://dashboard.composio.dev/vramirez75_workspace/vramirez75_workspace_first_project/triggers)
 > **Submitted by:** Victor Ramirez · June 2026
 
 ---
@@ -19,7 +22,7 @@ When an email arrives at a connected Gmail account, the agent:
 
 No human in the loop. No manual polling. The agent runs on Vercel serverless infrastructure and wakes up only when triggered.
 
-All **npm packages** are proxied through **JFrog Artifactory** - the project registry is configured to route every `pnpm install` through a private JFrog virtual npm repository, giving the team full visibility, caching, and control over the dependency supply chain.
+All **npm packages** are proxied through **[JFrog Artifactory](https://trialw56ywp.jfrog.io/ui/repos/tree/General/victor-npm)** - the project registry is configured to route every `pnpm install` through a private JFrog virtual npm repository (`victor-npm`), giving the team full visibility, caching, and control over the dependency supply chain.
 
 ---
 
@@ -153,6 +156,8 @@ cp .npmrc.example .npmrc
 # Edit .npmrc and replace YOUR_TOKEN_HERE with your JFrog Artifactory token
 ```
 
+Get your token from the [JFrog Artifactory virtual repository](https://trialw56ywp.jfrog.io/ui/repos/tree/General/victor-npm): **User Profile → Generate Identity Token**.
+
 ### 2. Install dependencies (routes through JFrog)
 
 ```bash
@@ -189,14 +194,14 @@ Connect your Gmail account in the Composio dashboard, then run:
 COMPOSIO_API_KEY=your_key npx tsx scripts/setup-trigger.ts
 ```
 
-This registers a `GMAIL_NEW_GMAIL_MESSAGE` polling trigger for the connected account.
+This registers a `GMAIL_NEW_GMAIL_MESSAGE` polling trigger for the connected account. Verify it appears in the [Composio triggers dashboard](https://dashboard.composio.dev/vramirez75_workspace/vramirez75_workspace_first_project/triggers).
 
 ### 6. Set the webhook URL in Composio
 
-In the [Composio dashboard](https://app.composio.dev) → **Settings → Webhooks**, set the webhook URL to:
+In the [Composio triggers dashboard](https://dashboard.composio.dev/vramirez75_workspace/vramirez75_workspace_first_project/triggers) → **Settings → Webhooks**, set the webhook URL to:
 
 ```
-https://your-vercel-url.vercel.app/api/agent
+https://trustclaw-jfrog-demo.vercel.app/api/agent
 ```
 
 ### 7. Test end-to-end

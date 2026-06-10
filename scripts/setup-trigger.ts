@@ -5,11 +5,12 @@
 // Usage:
 //   COMPOSIO_API_KEY=<key> COMPOSIO_CONNECTED_ACCOUNT_ID=<id> npx tsx scripts/setup-trigger.ts
 //
-// Find your connected account ID in the Composio dashboard:
+// Find your connected account ID in the Composio triggers dashboard:
+//   https://dashboard.composio.dev/vramirez75_workspace/vramirez75_workspace_first_project/triggers
 //   Toolkits → Gmail → Connected Accounts → copy the ID (starts with ca_)
 //
-// After running, set the webhook URL in the Composio dashboard:
-//   Settings → Webhooks → https://<your-vercel-url>/api/agent
+// After running, set the webhook URL in the Composio triggers dashboard:
+//   Settings → Webhooks → https://trustclaw-jfrog-demo.vercel.app/api/agent
 
 const apiKey = process.env.COMPOSIO_API_KEY;
 if (!apiKey) throw new Error("COMPOSIO_API_KEY env var is required");
