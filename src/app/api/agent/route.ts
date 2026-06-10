@@ -1,5 +1,6 @@
 import { generateText } from "ai";
 import { NextResponse } from "next/server";
+import { env } from "~/env";
 import { createComposioClient } from "~/server/clients/composio";
 import { gmailWebhookPayload } from "./_agent-webhook.schema";
 
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
   // Only process emails from the configured allowed domain. Prevents the agent
   // from replying to newsletters, notifications, and bounce messages that arrive
   // in the shared Gmail inbox.
-  const allowedDomain = process.env.AGENT_ALLOWED_SENDER_DOMAIN;
+  const allowedDomain = env.AGENT_ALLOWED_SENDER_DOMAIN;
   if (allowedDomain && !recipientEmail.endsWith(allowedDomain)) {
     console.warn("[agent] skipping: sender not in allowed domain:", recipientEmail);
     return NextResponse.json({ ok: true });

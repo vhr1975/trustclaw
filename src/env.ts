@@ -40,6 +40,9 @@ export const env = createEnv({
     RATE_LIMIT_FAIL_MODE: z.enum(["open", "closed"]),
     RATE_LIMIT_ENABLED: booleanString.default("true"),
 
+    // Email agent domain filter (optional - process all senders when missing)
+    AGENT_ALLOWED_SENDER_DOMAIN: z.string().optional(),
+
     // Cron auth. Required in production so unauthenticated callers can't hit
     // /api/cron/* endpoints. Vercel auto-injects this when crons are configured
     // in vercel.json; the trustclaw deploy CLI also generates one on first deploy.
@@ -70,6 +73,7 @@ export const env = createEnv({
         : "closed"),
     RATE_LIMIT_ENABLED: process.env.RATE_LIMIT_ENABLED,
     CRON_SECRET: process.env.CRON_SECRET,
+    AGENT_ALLOWED_SENDER_DOMAIN: process.env.AGENT_ALLOWED_SENDER_DOMAIN,
 
     // Client URL resolution:
     //  - dev: derive from PORT so `PORT=3001 pnpm dev` just works
